@@ -1,14 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
+from astropy.io import fits
+from datetime import datetime
+import errno
+import numpy as np
 from os import listdir
 from os.path import isfile, join, getmtime, exists
-from astropy.io import fits
-import numpy as np
-import errno
+import warnings
 
 class Observation:
     """
@@ -30,15 +32,14 @@ class Observation:
         masterFlats:  3d ndarray representing all master flats
         filters:      list of all filters found
         
-        
     TODO:
         - Triple check that bias, dark and flat reduction is actually perfomed correctly
         - Evaluate efficiency of calculations and variable storing
-        - Allow 1x1 binning (!)
         - Add methods that might be useful (Astrometry, saving, reducing images etc.)
         - And more probably
         
     Created by FGunnink on 02-10-2020
+    Updated on 24-12-2020
     """
     
     def __init__(self, foldername):
@@ -71,42 +72,6 @@ class Observation:
         self.masterFlats = None
         
         self.group_content(foldername)  # Group all the content of the folder
-        
-    def print_content(self, keywords=["IMAGETYP", "EXPTIME", "FILTER", "IMGSIZE"], files=None):
-        """
-        Public method that creates a table containing information about a list of fits files. Passed 
-        keywords are read from the header on a per file basis, and then printed to the screen. If no 
-        keys are passed, a sample set of keys is used which suffices for most tasks. Remember that keys 
-        should be capitalized string objects, just like they can also be found in a fits header.
-        
-        Keyword Args:
-            keywords (list of strings): the list of keywords you want to look for in the fits header
-            files (list of strings): the absolute paths to the files you want to evaluate
-            
-        Prints:
-            Prints a table with columns corresponding to the (given) keywords, and rows containing 
-            the result of the (given) files
-            
-        """
-        
-        if files is None:
-            files = self.files
-        
-        if not self.files:
-            print("Nothing to show")
-            return
-        
-        # Construct the top of the table
-        table_row_base = "|{:>36} |" + len(keywords)*"{:>14} |"
-        print(table_row_base.format("Filename", *keywords))
-        print("-"*(39 + len(keywords)*16))
-        
-        # Loop over every file and read its header keywords
-        for filepath in files:
-            filename = filepath.split("/")[-1]
-            filename = ("..." + filename[-30:]) if len(filename) > 30 else filename
-            results = self.get_file_info(filepath, keywords)  # Get values for header keywords
-            print(table_row_base.format(filename, *results))
             
     def get_files(self, condit=None):
         """
@@ -147,7 +112,8 @@ class Observation:
             foldername (string): an existing absolute path to the folder
         
         """
-        keywords = ["IMAGETYP", "EXPTIME", "FILTER"]  # These keywords are needed for categorising
+        # These keywords are needed for categorising
+        keywords = ["IMAGETYP", "EXPTIME", "FILTER"]
         
         # Lists containing the designated files. In the end, these become object attributes
         lightFiles = []
@@ -162,7 +128,8 @@ class Observation:
                             and (file.endswith(".fits")
                             or file.endswith(".FIT"))))]
 
-        sortedContent = sorted(folderContent, key=getmtime)  # Sort the content on modificationd date
+        # Sort the content on modification date
+        sortedContent = sorted(folderContent, key=getmtime)
         
         # Loop over each file in the data dir       
         for filename in sortedContent: 
@@ -176,8 +143,6 @@ class Observation:
 
             # And store the different types of filters as well
             if fltr not in filterTypes: filterTypes.append(fltr)
-
-        date = (foldername.split("images/")[1]).split("/")[-1]
         
         # Turn every list that we have into an object attribute
         self.files = sortedContent
@@ -215,6 +180,9 @@ class Observation:
                     # Special custom keyword "IMGSIZE" (read method docstring)
                     if keyword == "IMGSIZE":
                         results.append(str(hduHeader["NAXIS1"]) + "x" + str(hduHeader["NAXIS2"]))
+                    # Another special custom keyword "IMGSIZE" (read method docstring)
+                    elif keyword == "BINNING":
+                        results.append(str(hduHeader["XBINNING"]) + "x" + str(hduHeader["YBINNING"]))
                     else:
                         results.append(hduHeader[keyword])
                         
@@ -223,6 +191,66 @@ class Observation:
                     results.append("?")
 
         return results
+    
+    def sort_closest(self, target, files):
+        """
+        Public method that sorts a list of passed files based on their creation time stored in the 
+        fits header. This new list is sorted such that that the first element is closest to the 
+        creation time of the target file. The next element is hence the next-closest, and so on.
+        
+        Args:
+            target (string): the path to the target file whose time is read and compared to.
+            files (list of strings): paths of the files that need to be compared to the target time
+                                     and sorted accordingly.
+                                     
+        Returns:
+            file_time_lst (list of 2D tuples): returns a list of 2D tuples, containing the path to 
+                                               the file and their creation time.
+        """
+        
+        # Read the creation time of the target file from the header
+        target_time_str = self.get_file_info(target, ["DATE-OBS"])[0]
+        target_time = datetime.strptime(target_time_str, '%Y-%m-%dT%H:%M:%S.%f')
+        
+        # List to store tuples of the passed files: (filepath, creation_time)
+        file_time_lst = []
+        
+        # Loop over every passed file and get their creation time
+        for file in files:
+            filetime_str = self.get_file_info(file, ["DATE-OBS"])[0]
+            filetime = datetime.strptime(filetime_str, '%Y-%m-%dT%H:%M:%S.%f')
+            file_time_lst.append((file, filetime))
+        
+        # Sort this list on their difference with the target file
+        file_time_lst = sorted(file_time_lst, key=lambda x: abs(x[1] - target_time))
+        return file_time_lst
+    
+    def check_binning(self, files):
+        """
+        Public method that checks whether every passed file has the same binning.
+        
+        Args:
+            files (list of strings): list of filepaths of the files that should be checked
+            
+        Returns:
+            -
+            
+        Raises:
+            IncompatibleBinningError
+            
+        """
+        # First, assume every file is equally large
+        binning = self.get_file_info(files[0], ["BINNING"])[0]
+        
+        # Then loop over every file and check their sizes
+        for file in files:
+            current_binning = self.get_file_info(file, ["BINNING"])[0]
+            
+            # If it differs from the first file, there's a problem
+            if current_binning != binning:
+                raise IncompatibleBinningError(file, binning, current_binning)
+        
+        return
         
     def create_master_bias(self, biasFiles=None):
         """
@@ -241,10 +269,13 @@ class Observation:
         
         if biasFiles is None:
             biasFiles = self.biasFiles
+            
+        self.check_binning(biasFiles)
         
         stackedBiasData = None
         
-        for i in range(len(biasFiles)):  # Loop over each bias .fits file
+        # Loop over each bias .fits file
+        for i in range(len(biasFiles)):
             filename = biasFiles[i]
 
             # Open fits file and read the header from the first HDU object
@@ -252,23 +283,25 @@ class Observation:
             hdu = hduList[0]
             hduHeader = hdu.header
 
-            # This block reads the TRIMSEC keyword from the header
+            # Get the width and length of the image
             NAXIS1 = hduHeader["NAXIS1"]
             NAXIS2 = hduHeader["NAXIS2"]
             
-            if NAXIS1 < 3072: continue  # For now, only 3x3 binning :(
-
-            if stackedBiasData is None:  # On the first loop, we create an empty 3D matrix containing the data
-                stackedBiasData = hdu.data        
+            # On the first loop, assign the hdu content to the variable
+            if stackedBiasData is None:
+                stackedBiasData = hdu.data 
+            # Afterwards, the content of each file can be stacked on axis=2
             else:
-                stackedBiasData = np.dstack((stackedBiasData, hdu.data))  # The content of each file is stacked on axis=2
+                stackedBiasData = np.dstack((stackedBiasData, hdu.data))
 
         # One-dimensionalize the stacked data if needed
         if len(biasFiles) > 1:
-            masterBias = np.median(stackedBiasData, axis=2)  # Take the median of each row along axis=2
+            # Take the median of each row along axis=2
+            masterBias = np.median(stackedBiasData, axis=2)
         else:
             masterBias = stackedBiasData
 
+        # Store the master Bias for later reference
         self.masterBias = masterBias
         
         return masterBias
@@ -294,15 +327,19 @@ class Observation:
         if darkFiles is None:
             darkFiles = self.darkFiles
             
+        self.check_binning(darkFiles)
+            
         if masterBias is None:
             masterBias = self.masterBias
             
-        EXPTIMEs = np.zeros(len(darkFiles))  # List to keep track of the exposure times of each dark frame
+        # List to keep track of the exposure times of each dark frame
+        EXPTIMEs = np.zeros(len(darkFiles))
         tolerance = 30  # Defines how large the biggest difference in exposure times should be
 
         stackedDarkData = None
 
-        for i in range(len(darkFiles)):  # Loop over each dark .fits file
+        # Loop over each dark .fits file
+        for i in range(len(darkFiles)):
             filename = darkFiles[i]
 
             # Open fits file and read the header from the first HDU object
@@ -314,34 +351,40 @@ class Observation:
             EXPTIME = hduHeader["EXPTIME"]
             EXPTIMEs[i] = EXPTIME
             
-            # TODO: fix a binning issue that leads to shape mismatching
+            # Get the width and length of the image
             NAXIS1 = hduHeader["NAXIS1"]
             NAXIS2 = hduHeader["NAXIS2"]
-            if NAXIS1 < 3072: continue  # For now, only 3x3 binning :(
             
-            darkBiasCorrected = hdu.data - masterBias  # Subtract the masterBias frame
+            # Subtract the masterBias frame
+            darkBiasCorrected = hdu.data - masterBias 
 
+            # On the first loop, assign the hdu content to the variable
             if stackedDarkData is None:
-                stackedDarkData = darkBiasCorrected  # Create an empty 3D matrix containing the data
+                stackedDarkData = darkBiasCorrected 
+            # Afterwards, the content of each file can be stacked on axis=2
             else:
-                stackedDarkData = np.dstack((stackedDarkData,darkBiasCorrected))  # The content of each file is stacked on axis=2
+                stackedDarkData = np.dstack((stackedDarkData,darkBiasCorrected))
 
         # For the best results, all exposure times should more or less be the same, so check that
         avgEXPTIME = EXPTIMEs.mean()
         largestDiff = EXPTIMEs.max() - EXPTIMEs.min()
+        
+        # Warning the user about possible problems due to exposure times
         if largestDiff > tolerance:
-            print("Warning: not all dark frames have the same exposure time!")  # Warning the user
-            print(f"Mean, largest deviation: {avgEXPTIME}, {largestDiff}\n")  # The calculations will however just return results
-
+            warnings.warn(f"The exposure time difference between dark frames is large: {largestDiff}s!")
+            
         # One-dimensionalize the stacked data if needed
         if len(darkFiles) > 1:
-            masterDarkUnnorm = np.median(stackedDarkData, axis=2)  # Take the median of each row along axis=2
+            # Take the median of each row along axis=2
+            masterDarkUnnorm = np.median(stackedDarkData, axis=2)
         else:
             masterDarkUnnorm = stackedDarkData
 
-        masterDark = masterDarkUnnorm / avgEXPTIME  # Normalize the frame by dividing by the average exposure time
+        # Normalize the frame by dividing by the average exposure time
+        masterDark = masterDarkUnnorm / avgEXPTIME
 
-        self.masterBias = masterBias
+        # Store the master Dark for later reference
+        self.masterDark = masterDark
 
         return masterDark
     
@@ -373,6 +416,8 @@ class Observation:
         if flatFiles is None:
             flatFiles = self.flatFiles
             
+        self.check_binning(flatFiles)
+            
         if filterTypes is None:
             filterTypes = self.filters
             
@@ -383,14 +428,18 @@ class Observation:
             masterBias = self.masterBias
         
         length, width = masterBias.shape
-        masterFlats = np.zeros((length, width, len(filterTypes)))  # List that will be filled with the masterFlat for each filter
+        
+        # Variable that stores the master Flat for each filter type
+        masterFlats = None
 
         # Each filter has its own masterFilter, so first we loop over each filter type
         for f in range(len(filterTypes)):
             filterType = filterTypes[f]
 
             stackedFlatData = None
-            for i in range(len(flatFiles)):  # Loop over each flat .fits file
+            
+            # Loop over each flat .fits file
+            for i in range(len(flatFiles)):
                 filename = flatFiles[i]
 
                 # Open fits file and read the header from the first HDU object
@@ -398,9 +447,9 @@ class Observation:
                 hdu = hduList[0]
                 hduHeader = hdu.header
                 
+                # Get the width and length of the image
                 NAXIS1 = hduHeader["NAXIS1"]
                 NAXIS2 = hduHeader["NAXIS2"]
-                if NAXIS1 < 3072: continue  # For now, only 3x3 binning :(
 
                 # Check whether the data uses the same filter as we're currently interested in
                 FILTER = hduHeader["FILTER"]
@@ -409,26 +458,38 @@ class Observation:
                 # This block reads the EXPTIME keyword from the header
                 EXPTIME = hduHeader["EXPTIME"]
                 masterDarkScaled = masterDark * EXPTIME  # Scale the masterDark to the current exposure time
+                
+                # Correct the frame by subtracting bias and dark currents
+                flatBiasDarkCorrected = hdu.data - masterBias - masterDarkScaled
 
-                flatBiasDarkCorrected = hdu.data - masterBias - masterDarkScaled  # Correct the frame by subtracting bias and dark currents
-
+                # Normalize the frame by dividing by the median value
                 frameMedian = np.median(flatBiasDarkCorrected)
-                flatNormalized = flatBiasDarkCorrected / frameMedian  # Normalize the frame by dividing by the median value
+                flatNormalized = flatBiasDarkCorrected / frameMedian
 
+                # On the first loop, assign the hdu content to the variable
                 if stackedFlatData is None:
-                    stackedFlatData = flatNormalized
+                    stackedFlatData = flatNormalized 
+                # Afterwards, the content of each file can be stacked on axis=2
                 else:
                     stackedFlatData = np.dstack((stackedFlatData, flatNormalized))
 
             # One-dimensionalize the stacked data if needed
             if len(flatFiles) > 1:
-                masterFlat = np.median(stackedFlatData, axis=2)  # Gives the masterFlat for the current filter as the median
+                # Gives the masterFlat for the current filter as the median
+                masterFlat = np.median(stackedFlatData, axis=2)
             else:
                 masterFlat = stackedFlatData
                 
-            masterFlat = np.where(masterFlat==0, 1e-100, masterFlat)  #  Replace 0-values with something very small: 1e-100
-            masterFlats[:,:,f] = masterFlat  # Store this 2D masterFlat in the 3D list of masterFlats
+            #  Replace 0-values with something very small: 1e-100
+            masterFlat = np.where(masterFlat==0, 1e-100, masterFlat)
+            
+            # Store this 2D masterFlat in the 3D list of masterFlats
+            if masterFlats is None:
+                masterFlats = masterFlat
+            else:
+                np.dstack((masterFlats, masterFlat))
 
+        # Store the master Flats for later reference
         if filterTypes == self.filters:
             self.masterFlats = masterFlats
         
@@ -519,4 +580,27 @@ class Observation:
     @filters.setter
     def filters(self, filterTypes):
         self._filterTypes = filterTypes
+        
+class IncompatibleBinningError(Exception):
+    """ Exception raised when a fits file has a different binning than 
+        what was expected
+        
+        Attributes:
+            file (string): the file that caused the error
+            binning (string): the expected binning
+            f_binning (string): the found binning            
+    """
+    
+    def __init__(self, file, binning, f_binning):
+        self.file = file
+        self.binning = binning
+        self.f_binning = f_binning
+        self.message = f"{self.file}: expected {self.binning} binning but found {self.f_binning} binning"
+        super().__init__(self.message)
+
+
+# In[ ]:
+
+
+
 
