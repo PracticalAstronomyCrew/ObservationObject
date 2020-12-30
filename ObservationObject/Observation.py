@@ -281,11 +281,6 @@ class Observation:
             # Open fits file and read the header from the first HDU object
             hduList = fits.open(filename)
             hdu = hduList[0]
-            hduHeader = hdu.header
-
-            # Get the width and length of the image
-            NAXIS1 = hduHeader["NAXIS1"]
-            NAXIS2 = hduHeader["NAXIS2"]
             
             # On the first loop, assign the hdu content to the variable
             if stackedBiasData is None:
@@ -350,10 +345,6 @@ class Observation:
             # This block reads the EXPTIME keyword from the header and stores it in a list
             EXPTIME = hduHeader["EXPTIME"]
             EXPTIMEs[i] = EXPTIME
-            
-            # Get the width and length of the image
-            NAXIS1 = hduHeader["NAXIS1"]
-            NAXIS2 = hduHeader["NAXIS2"]
             
             # Subtract the masterBias frame
             darkBiasCorrected = hdu.data - masterBias 
@@ -446,10 +437,6 @@ class Observation:
                 hduList = fits.open(filename)
                 hdu = hduList[0]
                 hduHeader = hdu.header
-                
-                # Get the width and length of the image
-                NAXIS1 = hduHeader["NAXIS1"]
-                NAXIS2 = hduHeader["NAXIS2"]
 
                 # Check whether the data uses the same filter as we're currently interested in
                 FILTER = hduHeader["FILTER"]
@@ -487,10 +474,10 @@ class Observation:
             if masterFlats is None:
                 masterFlats = masterFlat
             else:
-                np.dstack((masterFlats, masterFlat))
+                masterFlats = np.dstack((masterFlats, masterFlat))
 
         # Store the master Flats for later reference
-        if filterTypes == self.filters:
+        if filterTypes == self.filters and flatFiles == self.flatFiles:
             self.masterFlats = masterFlats
         
         return masterFlats
