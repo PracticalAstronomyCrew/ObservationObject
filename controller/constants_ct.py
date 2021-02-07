@@ -7,6 +7,7 @@ tele_subsubdirs = ("g", "i")
 
 # User-specific path constants
 base_path = os.path.normpath("/Users/users/gunnink/PAC/Data/")
+#base_path = os.path.normpath("/net/dataserver3/data/users/sterrenwacht/obslog")
 raw_dir = "Raw"
 reduced_dir = "Reduced"
 correction_dir = "Correction"

@@ -18,14 +18,15 @@ data pipeline. The current list of (intended) features include:
 - [X] Copy raw files to backup directory
 - [X] Create and save the raw correction frames
   - [X] Generate frame types (Bias, Dark, Flat field)
-  - [X] Use correct binning
-- [ ] Reduce and save light frames
-  - [X] Reduce using all found correction frames
-  - [ ] Cleverly classify correction frames based on creation time
+  - [X] Cleverly classify correction frames in clusters based on creation time
+  - [X] Keep track of binning and filters
+- [X] Reduce and save light frames
+  - [X] Reduce images using the closest correction frame clusters
+  - [X] Append information about reduction process in header
 - [ ] Run frames through Astrometry
   - [ ] Alternate between raw & reduced when Astrometry fails
   - [ ] Save new information inside header
 - [ ] Add new header keywords
-  - [ ] Reference files used for reduction
-  - [ ] STARALT info
+  - [~] Reference files used for all performed processes
+  - [~] STARALT info
 - [ ] Generate log about the performed actions
