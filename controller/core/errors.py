@@ -18,17 +18,6 @@ class UnknownBinningError(Exception):
         self.message = message
         super().__init__(self.message)
         
-class TooManyClustersError(Exception):
-    """ Exception raised when the clustering of the files resulted in more than
-        three seperate clusters. 
-        
-        Attributes:
-            message (string): message that will be displayed on throw        
-    """
-    def __init__(self, message):
-        self.message = message
-        super().__init__(self.message)
-        
 class SuitableMasterMissingError(Exception):
     """ Exception raised when no suitable master frame could be found near the 
         target datetime.
@@ -39,3 +28,4 @@ class SuitableMasterMissingError(Exception):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
+        

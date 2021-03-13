@@ -1,3 +1,4 @@
+
 The Observation Object
 ======================
 This python class enables the user to quickly gain control over the data of an observation night. To initialise
@@ -46,16 +47,19 @@ Header keywords
 -------------
 The Controller adds new header keywords during correction frame creation and reduction. For the sake of completeness, here follows a list of the introduced keywords, where they can be found and what they mean.
 
-| Frame type         | Header Keyword | Meaning        | Used        | 
-|--------------------|----------------|----------------|-------------|
-| Bias/Dark/Flat     | KW-SRCN        | The number of frames used for generating this master correction frame | :white_check_mark:
-| Bias/Dark/Flat     | KW-SRC#        | Gives the path to the #'th frame used in the frame generation. The # can be replaced with an integer up to the value in KW-SRCN. For example, the header keyword KW-SRC1 gives the path to the first file used. | :white_check_mark: 
-|Dark/Flat/Light     | KW-MBAGE       | Gives the number of days between the creation time of the current frame and the bias frame used in the reduction process. | :white_check_mark:
-|Flat/Light          | KW-MDAGE       | Gives the number of days between the creation time of the current frame and the dark frame used in the reduction process. | :white_check_mark:
-|Light               | KW-MFAGE       | Gives the number of days between the creation time of the current frame and the flat field used in the reduction process. | :white_check_mark:
-|Light               | KW-MBIAS         | The path to the master bias that was used in the reduction process. | :white_check_mark:
-|Light               | KW-MDARK         | The path to the master dark that was used in the reduction process. | :white_check_mark:
-|Light               | KW-MFLAT         | The path to the master flat that was used in the reduction process. | :white_check_mark:
+| Header Keyword <img width=100/>| Frame type <img width=250/>    | Meaning        |
+|--------------------------------|--------------------------------|----------------|
+| KW-TRAW                        | Bias/Dark/Flat/Light           | Path to the raw version of this file as stored on the telescope dataserver |
+| KW-PRAW                        | Bias/Dark/Flat/Light           | Path to the raw version of this file as stored on the pipeline dataserver  |
+| KW-PRED                        | Bias/Dark/Flat/Light           | Path to the reduced version of this file as stored on the pipeline dataserver  |
+| KW-SRCN                        | (Mas.) Bias/Dark/Flat          | The number of frames used for generating this master correction frame |
+| KW-SRC#                        | (Mas.) Bias/Dark/Flat          | Gives the path to the #'th frame used in the frame generation. The # can be replaced with an integer up to the value in KW-SRCN. For example, the header keyword KW-SRC1 gives the path to the first file used. |
+| KW-MBAGE                       | (Mas.) Dark/Flat/ (Red.) Light | Gives the number of days between the creation time of the current frame and the bias frame used in the reduction process. |
+| KW-MDAGE                       | (Mas.) Flat/ (Red.) Light      | Gives the number of days between the creation time of the current frame and the dark frame used in the reduction process. |
+| KW-MFAGE                       | (Red.) Light                   | Gives the number of days between the creation time of the current frame and the flat field used in the reduction process. |
+| KW-MBIAS                       | (Red.) Light                   | The path to the master bias that was used in the reduction process. |
+| KW-MDARK                       | (Red.) Light                   | The path to the master dark that was used in the reduction process. |
+| KW-MFLAT                       | (Red.) Light                   | The path to the master flat that was used in the reduction process. |
 
 
 Naming conventions

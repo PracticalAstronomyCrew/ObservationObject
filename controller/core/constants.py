@@ -16,7 +16,7 @@ tele_subsubdirs = ("g", "i")
 
 # User-specific path constants
 #base_path = os.path.normpath("/Users/users/gunnink/PAC/Data/")
-base_path = os.path.normpath("/net/dataserver3/data/users/sterrenwacht/obslog/")
+base_path = os.path.normpath("/net/dataserver3/data/users/noelstorr/blaauwpipe/")
 raw_dir = "Raw"
 reduced_dir = "Reduced"
 correction_dir = "Correction"
@@ -26,6 +26,13 @@ pending_log = "pending_log.csv"
 #-----------------------------------------
 #           New header keywords
 #-----------------------------------------
+
+# Path to the original raw file as stored on the telescope dataserver
+HKW_traw = "KW-TRAW"
+# Path to the raw file as stored on the pipeline dataserver
+HKW_praw = "KW-PRAW"
+# Path to the reduced file as stored on the pipeline dataserver
+HKW_pred = "KW-PRED"
 
 # Specifies the number of files used in combining process
 # to create a master correction frame
