@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[2]:
-
-
 from astropy.io import fits
 from datetime import datetime
 import errno
@@ -12,7 +6,7 @@ from os import listdir
 from os.path import isfile, join, getmtime, exists
 import warnings
 
-class Observation:
+class Observation(object):
     """
     This class provides a convenient way to access, view and manipulate the data of an observation
     night. An instance of this class is linked to a certain directory containing .fits or .fit files 
@@ -35,7 +29,6 @@ class Observation:
     TODO:
         - Triple check that bias, dark and flat reduction is actually perfomed correctly
         - Evaluate efficiency of calculations and variable storing
-        - Add methods that might be useful (Astrometry, saving, reducing images etc.)
         - And more probably
         
     Created by FGunnink on 02-10-2020
@@ -68,7 +61,7 @@ class Observation:
         # Prime the newly created object with some attributes
         self.foldername = foldername
         
-        self.group_content()  # Group all the content of the folder
+        self.group_raw_content()  # Group all the content of the folder
             
     def get_files(self, condit=None):
         """
@@ -99,7 +92,7 @@ class Observation:
             
         return result
         
-    def group_content(self):
+    def group_raw_content(self):
         """
         Private method that loops over all the files in the given foldername, and groups them into 
         their respective list based on their image type. Besides, it keeps track of all the 
@@ -116,9 +109,7 @@ class Observation:
 
         # Get the (valid!) files in the given folder, so either .fits or .fit
         folderContent = [join(self.foldername, file) for file in listdir(self.foldername)
-                         if (isfile(join(self.foldername, file)
-                            and (file.endswith(".fits")
-                            or file.endswith(".FIT"))))]
+                         if (isfile(join(self.foldername, file)) and (file.endswith(".fits") or file.endswith(".FIT")))]
 
         # Sort the content on modification date
         sortedContent = sorted(folderContent, key=getmtime)
@@ -145,7 +136,8 @@ class Observation:
         self.filters = filterTypes
         self.binnings = binningTypes
         
-    def get_file_info(self, filename, header_keywords):
+    @staticmethod
+    def get_file_info(filename, header_keywords):
         """
         Private method that reads a list of keywords, specified in header_keywords, in the header of
         the given file. Returns a list of the same size as header_keywords, with all the 
@@ -238,7 +230,8 @@ class Observation:
         file_time_lst = sorted(file_time_lst, key=lambda x: abs(x[1] - target_time))
         return file_time_lst
     
-    def get_file_clusters(self, files, step=3600):
+    @staticmethod
+    def get_file_clusters(files, step=3600):
         """ Function that splits the passed list of files into clusters.
             Clusters are groups of files that belong together, because 
             they were taken shortly after each other. If the creation time
@@ -326,7 +319,7 @@ class Observation:
         
         return bias_clusters
     
-    def get_dark_clusters(self, binning, minSize=5):
+    def get_dark_clusters(self, binning, minSize=1):
         # Get suitable dark frames
         dark_condit = {"IMAGETYP": "Dark Frame", "BINNING": binning}
         dark_files = self.get_files(condit=dark_condit)
@@ -337,10 +330,12 @@ class Observation:
 
         # Split the files into clusters and create the master dark for each cluster
         dark_clusters = self.get_file_clusters(dark_files)
+        # Only keep clusters with enough files
+        dark_clusters = [cluster for cluster in dark_clusters if len(cluster) >= minSize]
         
         return dark_clusters
     
-    def get_flat_clusters(self, binning, fltr, minSize=5):
+    def get_flat_clusters(self, binning, fltr, minSize=1):
         # Get suitable flat fields
         flat_condit = {"IMAGETYP": "Flat Field", "BINNING": binning, "FILTER": fltr}
         flat_files = self.get_files(condit=flat_condit)
@@ -351,6 +346,8 @@ class Observation:
 
         # Split the files into clusters and create the master dark for each cluster
         flat_clusters = self.get_file_clusters(flat_files)
+        # Only keep clusters with enough files
+        flat_clusters = [cluster for cluster in flat_clusters if len(cluster) >= minSize]
         
         return flat_clusters
         
@@ -526,6 +523,7 @@ class Observation:
                 masterDarkScaled = masterDark * EXPTIME  # Scale the masterDark to the current exposure time
                 
                 # Correct the frame by subtracting bias and dark currents
+#                 print(hdu.data.shape, masterBias.shape, masterDarkScaled.shape)
                 flatBiasDarkCorrected = hdu.data - masterBias - masterDarkScaled
 
                 # Normalize the frame by dividing by the median value
@@ -644,10 +642,3 @@ class IncompatibleBinningError(Exception):
         self.f_binning = f_binning
         self.message = f"{self.file}: expected {self.binning} binning but found {self.f_binning} binning"
         super().__init__(self.message)
-
-
-# In[ ]:
-
-
-
-

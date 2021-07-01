@@ -1,5 +1,0 @@
-Date, Frame type, Binning, Filter, BIAS-AGE, DARK-AGE, FLAT-AGE, Expires, Path
-2020-04-22, Dark file, 1x1, B, -2, -, -, 2020-04-24, /net/dataserver3/data/users/sterrenwacht/obslog/200422/STL-6303E/i/Correction/master_dark1x1C1.fits
-2020-04-22, Light file, 3x3, O[III], ?, ?, ?, -, /net/vega/data/users/observatory/images/200422/STL-6303E/i/200422_Li_.00000116.NGC_6543.FIT
-2020-04-22, Light file, 3x3, S[II], ?, ?, ?, -, /net/vega/data/users/observatory/images/200422/STL-6303E/i/200422_Li_.00000117.NGC_6543.FIT
-2020-04-22, Light file, 3x3, O[III], ?, ?, ?, -, /net/vega/data/users/observatory/images/200422/STL-6303E/i/200422_Li_.00000118.NGC_6543.FIT
